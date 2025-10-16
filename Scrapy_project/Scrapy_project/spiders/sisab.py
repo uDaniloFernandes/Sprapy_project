@@ -1,42 +1,20 @@
 import scrapy
 import os
 from random import randint
+from .get_dates import DateFinderSpider
 
 
-class SisabSpider(scrapy.Spider):
+class SisabSpider(DateFinderSpider):
     datas_alvo = ["202502" ,"202501", "202412", "202411", "202410", "202409", "202408", "202407", "202406", "202405", "202404",
                   "202403"]
 
     name = "sisab"
 
-    def start_requests(self):
-        """
-        Faz o primeiro GET para capturar o ViewState
-        """
-
-        url = "https://sisab.saude.gov.br/paginas/acessoRestrito/relatorio/federal/saude/RelSauProducao.xhtml"
-        headers = {
-            "User-Agent": "Mozilla/5.0"
-        }
-        yield scrapy.Request(url=url, callback=self.parse_viewstate)
-
-
-    def get_all_dates(self, response):
-        """
-        Extrai todos os valores de competência (datas) do elemento <select name="j_idt76"> oculto.
-        """
-
-        # Coletando as datas disponiveis:
-        datas_disponiveis = response.css('select[name="j_idt76"] option::attr(value)').getall()
-
-        if not datas_disponiveis:
-            self.logger.warning("Nenhuma data (competência) encontrada no elemento oculto.")
-            return []
-
-        return datas_disponiveis
-
-
     def dates_filter(self, datas_alvo: list[str], datas_disponiveis: list[str]):
+        """
+        Filtra as datas requeridas com base nas datas disponíveis.
+        """
+
         datas_filtradas = []
         for data in datas_disponiveis:
             if data in datas_alvo:
@@ -44,7 +22,7 @@ class SisabSpider(scrapy.Spider):
         return datas_filtradas
 
 
-    def parse_viewstate(self, response):
+    def process_dates(self, response, dates):
         """
         Extrai o javax.faces.ViewState e monta o POST final
         """
@@ -56,7 +34,8 @@ class SisabSpider(scrapy.Spider):
 
         self.logger.info(f"ViewState capturado: {viewstate[:25]}...")
 
-        dates = self.dates_filter(self.datas_alvo, self.get_all_dates(response))
+        # A lógica de filtragem foi mantida, usando as `datas` que o spider base encontrou
+        datas_para_usar = self.dates_filter(self.datas_alvo, dates)
 
         form_data = {
             "j_idt44": "j_idt44",
@@ -66,22 +45,22 @@ class SisabSpider(scrapy.Spider):
             "td-ls-sigtap_length": "10",
             "unidGeo": "estado",
 
-            # múltiplos estados selecionados
+            # Seleção de estados
             "estados": [
                 "AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT",
                 "PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"
             ],
 
-            # competências selecionadas
-            "j_idt76": dates,
+            # Periodo de datas
+            "j_idt76": datas_para_usar,
 
             "selectLinha": "ATD.CO_UF_IBGE",
             "selectcoluna": "CO_TIPO_ATENDIMENTO",
 
-            # tipos de equipe
+            # Tipos de equipe
             "j_idt89": ["eq-esf","eq-eacs","eq-nasf","eq-eab","eq-ecr","eq-sb","eq-epen","eq-eap"],
 
-            # categorias profissionais
+            # Categorias dos profissionais
             "categoriaProfissional": [
                 "3","5","6","7","8","9","10","11","12","13","14","15","16","17",
                 "18","19","20","21","22","23","24","25","26","27","30","31"
@@ -90,11 +69,16 @@ class SisabSpider(scrapy.Spider):
             "idadeInicio": "0",
             "idadeFim": "0",
 
-            # locais de atendimento 1 a 10
+            # Locais de atendimento
             "localAtendimento": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
 
+            # Tipos de atendimento
             "tipoAtendimento": ["2", "5", "6"],
+
+            # Tipos de produção
             "tpProducao": "4",
+
+            # Condição avaliada
             "condicaoAvaliada": "ABP014",
 
             "javax.faces.ViewState": viewstate,
@@ -142,5 +126,3 @@ class SisabSpider(scrapy.Spider):
             f.write(response.body)
 
         self.logger.info(f"CSV salvo com sucesso em: {path}")
-
-
