@@ -10,6 +10,22 @@ class SisabSpider(DateFinderSpider):
 
     name = "sisab"
 
+    # Este método é a "ponte" entre a API e o Spider.
+    def start_requests(self):
+        """
+        Captura o `task_id` passado pela linha de comando (`-a task_id=...`)
+        e o injeta na requisição inicial para que ele seja rastreado.
+        """
+        # Pega o 'task_id' passado via argumento. Se não houver, o spider funcionará no modo antigo.
+        task_id = getattr(self, 'task_id', None)
+        
+        # Chama o start_requests original do DateFinderSpider (que busca a página),
+        # mas agora passando o task_id no meta da requisição.
+        for req in super().start_requests():
+            if task_id:
+                req.meta['task_id'] = task_id
+            yield req
+
     def dates_filter(self, datas_alvo: list[str], datas_disponiveis: list[str]):
         """
         Filtra as datas requeridas com base nas datas disponíveis.
@@ -26,6 +42,8 @@ class SisabSpider(DateFinderSpider):
         """
         Extrai o javax.faces.ViewState e monta o POST final
         """
+        # Passa o task_id para a próxima requisição
+        task_id = response.meta.get('task_id')
 
         viewstate = response.css('input[name="javax.faces.ViewState"]::attr(value)').get()
         if not viewstate:
@@ -34,7 +52,7 @@ class SisabSpider(DateFinderSpider):
 
         self.logger.info(f"ViewState capturado: {viewstate[:25]}...")
 
-        # Filtragem das datas
+        # A lógica de filtragem foi mantida, usando as `datas` que o spider base encontrou
         datas_para_usar = self.dates_filter(self.datas_alvo, dates)
 
         form_data = {
@@ -99,30 +117,43 @@ class SisabSpider(DateFinderSpider):
             method="POST",
             headers=headers,
             callback=self.save_csv,
+            meta={'task_id': task_id} # Garante que o task_id chegue na função final
         )
 
 
     def save_csv(self, response):
         """
-        Salva o arquivo CSV retornado pelo POST
+        Salva o arquivo CSV retornado pelo POST, com lógica de erro robusta.
         """
+        # Para integração com a API, um 'task_id' pode ser passado via meta.
+        # Se não houver, usa um número aleatório para manter a compatibilidade.
+        task_id = response.meta.get('task_id', f"random_{randint(1, 10000)}")
 
-        output_dir = os.path.join(os.path.expanduser('~'), "Downloads")
-        os.makedirs(output_dir, exist_ok=True)
+        try:
+            # 1. Validação da Resposta: Garante que o servidor não retornou uma página de erro.
+            content_type = response.headers.get("Content-Type", b"").decode()
+            if "csv" not in content_type and "octet-stream" not in content_type:
+                # Este é um erro de lógica de negócio, não de sistema.
+                # A requisição foi feita com parâmetros que o servidor não aceitou.
+                raise IOError(f"O servidor retornou um tipo de conteúdo inesperado ({content_type}) em vez de um arquivo CSV. A requisição pode ter sido inválida.")
 
-        file_id = randint(1, 10000)
-        filename = f"Relatório-SISAB_{file_id}.csv"
-        path = os.path.join(output_dir, filename)
+            # 2. Definição do Caminho de Saída Dinâmico
+            output_dir = os.path.join(os.path.expanduser('~'), "Downloads")
+            os.makedirs(output_dir, exist_ok=True)
+            filename = f"Relatorio-SISAB_{task_id}.csv"
+            path = os.path.join(output_dir, filename)
 
-        # Garante que a resposta seja CSV
-        content_type = response.headers.get("Content-Type", b"").decode()
-        if "csv" not in content_type and "octet-stream" not in content_type:
-            self.logger.error("O retorno não é CSV/Download. O servidor retornou HTML/Erro.")
-            self.logger.debug(f"Tipo de Conteúdo Recebido: {content_type}")
-            self.logger.debug(response.text[:500])
-            return
+            # 3. Escrita do Arquivo
+            with open(path, "wb") as f:
+                f.write(response.body)
 
-        with open(path, "wb") as f:
-            f.write(response.body)
+            self.logger.info(f"CSV da tarefa '{task_id}' salvo com sucesso em: {path}")
+            # Em um fluxo de API, aqui você atualizaria o status da tarefa para "CONCLUIDO"
+            # db_client.update_task(task_id=task_id, status="CONCLUIDO")
 
-        self.logger.info(f"CSV salvo com sucesso em: {path}")
+        except Exception as e:
+            # 4. Captura Centralizada de Erros na Função
+            error_message = f"Falha ao processar e salvar o resultado da tarefa '{task_id}': {e}"
+            self.logger.error(error_message)
+            # Em um fluxo de API, aqui você atualizaria o status da tarefa para "ERRO"
+            # db_client.update_task(task_id=task_id, status="ERRO", error_message=str(e))
