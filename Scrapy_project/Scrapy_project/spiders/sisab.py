@@ -34,7 +34,7 @@ class SisabSpider(DateFinderSpider):
 
         self.logger.info(f"ViewState capturado: {viewstate[:25]}...")
 
-        # A lógica de filtragem foi mantida, usando as `datas` que o spider base encontrou
+        # Filtragem das datas
         datas_para_usar = self.dates_filter(self.datas_alvo, dates)
 
         form_data = {
@@ -107,11 +107,11 @@ class SisabSpider(DateFinderSpider):
         Salva o arquivo CSV retornado pelo POST
         """
 
-        output_dir = r"C:\Users\CintraMan\Downloads"
+        output_dir = os.path.join(os.path.expanduser('~'), "Downloads")
         os.makedirs(output_dir, exist_ok=True)
 
         file_id = randint(1, 10000)
-        filename = f"Relatorio-SISAB_{file_id}.csv"
+        filename = f"Relatório-SISAB_{file_id}.csv"
         path = os.path.join(output_dir, filename)
 
         # Garante que a resposta seja CSV
