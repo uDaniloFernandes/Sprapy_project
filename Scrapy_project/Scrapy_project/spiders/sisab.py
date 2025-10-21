@@ -16,7 +16,7 @@ class SisabSpider(DateFinderSpider):
         Captura o `task_id` passado pela linha de comando (`-a task_id=...`)
         e o injeta na requisição inicial para que ele seja rastreado.
         """
-        # Pega o 'task_id' passado via argumento. Se não houver, o spider funcionará no modo antigo.
+        # Pega o 'task_id' passado via argumento. Se não houver, o spider funcionará normalmente, mas sem a lógica da API.
         task_id = getattr(self, 'task_id', None)
         
         # Chama o start_requests original do DateFinderSpider (que busca a página),
@@ -52,7 +52,7 @@ class SisabSpider(DateFinderSpider):
 
         self.logger.info(f"ViewState capturado: {viewstate[:25]}...")
 
-        # A lógica de filtragem foi mantida, usando as `datas` que o spider base encontrou
+        # Filtragem das datas
         datas_para_usar = self.dates_filter(self.datas_alvo, dates)
 
         form_data = {
@@ -130,20 +130,20 @@ class SisabSpider(DateFinderSpider):
         task_id = response.meta.get('task_id', f"random_{randint(1, 10000)}")
 
         try:
-            # 1. Validação da Resposta: Garante que o servidor não retornou uma página de erro.
+            # Validação da Resposta: Garante que o servidor não retornou uma página de erro.
             content_type = response.headers.get("Content-Type", b"").decode()
             if "csv" not in content_type and "octet-stream" not in content_type:
                 # Este é um erro de lógica de negócio, não de sistema.
                 # A requisição foi feita com parâmetros que o servidor não aceitou.
                 raise IOError(f"O servidor retornou um tipo de conteúdo inesperado ({content_type}) em vez de um arquivo CSV. A requisição pode ter sido inválida.")
 
-            # 2. Definição do Caminho de Saída Dinâmico
+            # Definição do Caminho de Saída Dinâmico
             output_dir = os.path.join(os.path.expanduser('~'), "Downloads")
             os.makedirs(output_dir, exist_ok=True)
             filename = f"Relatorio-SISAB_{task_id}.csv"
             path = os.path.join(output_dir, filename)
 
-            # 3. Escrita do Arquivo
+            # Escrita do Arquivo
             with open(path, "wb") as f:
                 f.write(response.body)
 
@@ -152,7 +152,7 @@ class SisabSpider(DateFinderSpider):
             # db_client.update_task(task_id=task_id, status="CONCLUIDO")
 
         except Exception as e:
-            # 4. Captura Centralizada de Erros na Função
+            # Captura Centralizada de Erros na Função
             error_message = f"Falha ao processar e salvar o resultado da tarefa '{task_id}': {e}"
             self.logger.error(error_message)
             # Em um fluxo de API, aqui você atualizaria o status da tarefa para "ERRO"
