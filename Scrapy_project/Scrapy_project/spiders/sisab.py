@@ -138,7 +138,9 @@ class SisabSpider(DateFinderSpider):
                 raise IOError(f"O servidor retornou um tipo de conteúdo inesperado ({content_type}) em vez de um arquivo CSV. A requisição pode ter sido inválida.")
 
             # Definição do Caminho de Saída Dinâmico
-            output_dir = os.path.join(os.path.expanduser('~'), "Downloads")
+            # Para o deploy, lê o caminho do disco a partir de uma variável de ambiente.
+            # Para testes locais, continua usando a pasta Downloads como padrão.
+            output_dir = os.environ.get("RENDER_DISK_PATH", os.path.join(os.path.expanduser('~'), "Downloads"))
             os.makedirs(output_dir, exist_ok=True)
             filename = f"Relatorio-SISAB_{task_id}.csv"
             path = os.path.join(output_dir, filename)

@@ -1,0 +1,51 @@
+# render.yaml - Instruções de deploy para a plataforma Render
+
+services:
+  # Serviço 1: O Banco de Dados PostgreSQL
+  # Ele armazenará o status de todas as tarefas de extração.
+  - type: psql
+    name: sisab-db
+    plan: free # Usa o plano gratuito do Render para o banco de dados
+
+  # Serviço 2: O Disco Persistente
+  # Um local de armazenamento na nuvem onde os arquivos CSV serão salvos pelo Scrapy
+  # e lidos pela API.
+  - type: disk
+    name: sisab-csv-storage
+    mountPath: /data/csv # O caminho onde o disco estará disponível para a API e o Worker
+    sizeGB: 1 # Tamanho do disco em Gigabytes
+    plan: free
+
+  # Serviço 3: A API FastAPI (Serviço Web)
+  # Ficará online para receber requisições dos usuários.
+  - type: web
+    name: sisab-api
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn api_service.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: DATABASE_URL
+        fromService:
+          type: psql
+          name: sisab-db
+          property: connectionString
+      - key: RENDER_DISK_PATH
+        value: /data/csv # Aponta para o caminho do disco definido acima
+
+  # Serviço 4: O Worker Scrapy (Serviço em Segundo Plano)
+  # Não fica exposto à internet. Roda em loop para processar as tarefas.
+  - type: worker
+    name: sisab-worker
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python worker.py"
+    envVars:
+      - key: DATABASE_URL
+        fromService:
+          type: psql
+          name: sisab-db
+          property: connectionString
+      - key: RENDER_DISK_PATH
+        value: /data/csv # Também aponta para o mesmo caminho do disco
