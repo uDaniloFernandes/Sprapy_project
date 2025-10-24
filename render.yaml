@@ -1,4 +1,4 @@
-# render.yaml - Instruções de deploy para a plataforma Render
+# render.yaml - Instruções de deploy para a plataforma Render (Serviço Monolítico)
 
 services:
   # Serviço 1: O Banco de Dados PostgreSQL
@@ -12,12 +12,12 @@ services:
   # e lidos pela API.
   - type: disk
     name: sisab-csv-storage
-    mountPath: /data/csv # O caminho onde o disco estará disponível para a API e o Worker
+    mountPath: /data/csv # O caminho onde o disco estará disponível para a API
     sizeGB: 1 # Tamanho do disco em Gigabytes
     plan: free
 
   # Serviço 3: A API FastAPI (Serviço Web)
-  # Ficará online para receber requisições dos usuários.
+  # Agora, este serviço também será responsável por iniciar o Scrapy.
   - type: web
     name: sisab-api
     env: python
@@ -32,20 +32,3 @@ services:
           property: connectionString
       - key: RENDER_DISK_PATH
         value: /data/csv # Aponta para o caminho do disco definido acima
-
-  # Serviço 4: O Worker Scrapy (Serviço em Segundo Plano)
-  # Não fica exposto à internet. Roda em loop para processar as tarefas.
-  - type: worker
-    name: sisab-worker
-    env: python
-    plan: free
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "python worker.py"
-    envVars:
-      - key: DATABASE_URL
-        fromService:
-          type: psql
-          name: sisab-db
-          property: connectionString
-      - key: RENDER_DISK_PATH
-        value: /data/csv # Também aponta para o mesmo caminho do disco

@@ -10,20 +10,26 @@ class SisabSpider(DateFinderSpider):
 
     name = "sisab"
 
-    # Este método é a "ponte" entre a API e o Spider.
+    # O construtor do spider agora recebe o task_id diretamente.
+    def __init__(self, task_id=None, *args, **kwargs):
+        """
+        Este método é chamado quando o spider é criado.
+        Recebe o `task_id` passado pelo CrawlerProcess da API.
+        """
+        super().__init__(*args, **kwargs)
+        self.task_id = task_id # Armazena o task_id como um atributo do spider
+        if not self.task_id:
+            self.logger.warning("Spider SisabSpider iniciado sem um task_id. Usará um ID aleatório para o arquivo.")
+
     def start_requests(self):
         """
-        Captura o `task_id` passado pela linha de comando (`-a task_id=...`)
-        e o injeta na requisição inicial para que ele seja rastreado.
+        Gera a requisição inicial, injetando o task_id no meta.
         """
-        # Pega o 'task_id' passado via argumento. Se não houver, o spider funcionará normalmente, mas sem a lógica da API.
-        task_id = getattr(self, 'task_id', None)
-        
         # Chama o start_requests original do DateFinderSpider (que busca a página),
         # mas agora passando o task_id no meta da requisição.
         for req in super().start_requests():
-            if task_id:
-                req.meta['task_id'] = task_id
+            if self.task_id:
+                req.meta['task_id'] = self.task_id
             yield req
 
     def dates_filter(self, datas_alvo: list[str], datas_disponiveis: list[str]):
