@@ -4,7 +4,7 @@ import sys
 from multiprocessing import Process, Queue
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, RedirectResponse
 import uvicorn
 
 from scrapy.crawler import CrawlerProcess
@@ -55,15 +55,15 @@ def run_sisab_process(queue: Queue, datas_alvo: list, output_file: str):
 
 app = FastAPI(
     title="API de Extração SISAB",
-    version="5.4.3-plaintext-home"
+    version="5.4.4-redirect-home"
 )
 
-@app.get("/", summary="Rota de Boas-Vindas", response_class=PlainTextResponse)
+@app.get("/", summary="Redireciona para a Documentação", include_in_schema=False)
 async def read_root():
     """
-    Retorna uma mensagem de boas-vindas em texto plano.
+    Redireciona a rota raiz diretamente para a documentação interativa.
     """
-    return "Bem-vindo à API de Extração de Dados do SISAB! Acesse /docs para a documentação."
+    return RedirectResponse(url="/docs", status_code=302)
 
 @app.get("/date-finder", summary="Retorna a lista de datas disponíveis no SISAB")
 def get_available_dates():
