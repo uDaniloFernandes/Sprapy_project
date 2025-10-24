@@ -1,26 +1,33 @@
 import scrapy
 
 class DateFinderSpider(scrapy.Spider):
-    """
-    Spider base que encontra as datas (competências) disponíveis no SISAB.
-    Quando executado diretamente (`scrapy crawl date_finder`), retorna as datas encontradas.
-    Quando herdado, passa as datas para o método `process_dates` do spider filho.
-    """
     name = "date_finder"
+    
+    # Adicionamos uma lista de classe para coletar os itens que o spider produz.
+    # A API irá ler desta lista após a execução do spider.
+    items = []
+
+    def __init__(self, *args, **kwargs):
+        """
+        O construtor é chamado toda vez que o spider é iniciado.
+        Limpamos a lista de itens para garantir que cada execução seja isolada.
+        """
+        super().__init__(*args, **kwargs)
+        self.items.clear()
 
     def start_requests(self):
         """
-        Faz o primeiro GET para a página do SISAB.
+        Faz o primeiro GET para a página de relatórios.
         """
         url = "https://sisab.saude.gov.br/paginas/acessoRestrito/relatorio/federal/saude/RelSauProducao.xhtml"
         headers = {
             "User-Agent": "Mozilla/5.0"
         }
-        yield scrapy.Request(url=url, callback=self.parse_page)
+        yield scrapy.Request(url=url, callback=self.parse_dates)
 
-    def parse_page(self, response):
+    def parse_dates(self, response):
         """
-        Extrai as datas e as passa para o método de processamento.
+        Extrai as datas disponíveis (competências) da página.
         """
         datas_disponiveis = response.css('select[name="j_idt76"] option::attr(value)').getall()
 
@@ -28,15 +35,10 @@ class DateFinderSpider(scrapy.Spider):
             self.logger.warning("Nenhuma data (competência) encontrada.")
             return
 
-        # O `yield from` permite que o método do spider filho (se existir) retorne suas próprias requisições.
-        yield from self.process_dates(response, datas_disponiveis)
-
-    def process_dates(self, response, dates):
-        """
-        Método padrão para processar as datas. Spiders filhos devem sobrescrevê-lo.
-        Se este spider for executado diretamente, ele simplesmente retorna as datas.
-        """
-        self.logger.info(f"Spider base encontrou {len(dates)} datas.")
-        yield {
-            "datas_disponiveis": dates
-        }
+        item = {"datas_disponiveis": datas_disponiveis}
+        
+        # Adiciona o item à lista da classe para que a API possa acessá-lo
+        self.items.append(item)
+        
+        # O yield ainda é importante para o fluxo padrão do Scrapy
+        yield item
