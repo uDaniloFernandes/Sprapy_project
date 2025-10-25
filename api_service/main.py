@@ -1,5 +1,5 @@
 import os
-import tempfile
+from pathlib import Path
 import sys
 from multiprocessing import Process, Queue
 
@@ -86,28 +86,33 @@ def start_extraction(datas_escolhidas: list[str]):
     if not datas_escolhidas:
         raise HTTPException(status_code=400, detail="A lista 'datas_escolhidas' não pode estar vazia.")
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as temp_file:
-        temp_file_path = temp_file.name
-        try:
-            q = Queue()
-            p = Process(target=run_sisab_process, args=(q, datas_escolhidas, temp_file_path))
-            p.start()
-            result = q.get()
-            p.join()
+    # Define o caminho para a pasta de Downloads do usuário que está executando o servidor
+    downloads_path = Path.home() / "Downloads"
+    downloads_path.mkdir(parents=True, exist_ok=True)
+    
+    output_filename = "Relatorio-SISAB.csv"
+    output_file_path = str(downloads_path / output_filename)
 
-            if isinstance(result, Exception):
-                raise HTTPException(status_code=500, detail=f"Falha durante a extração: {result}")
-            if result != "SUCCESS":
-                raise HTTPException(status_code=500, detail=f"O processo de extração falhou com um resultado inesperado: {result}")
+    try:
+        q = Queue()
+        p = Process(target=run_sisab_process, args=(q, datas_escolhidas, output_file_path))
+        p.start()
+        result = q.get()
+        p.join()
 
-            return FileResponse(
-                path=temp_file_path,
-                media_type='text/csv',
-                filename="Relatorio-SISAB.csv"
-            )
-        finally:
-            if os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
+        if isinstance(result, Exception):
+            raise HTTPException(status_code=500, detail=f"Falha durante a extração: {result}")
+        if result != "SUCCESS":
+            raise HTTPException(status_code=500, detail=f"O processo de extração falhou com um resultado inesperado: {result}")
+
+        return FileResponse(
+            path=output_file_path,
+            media_type='text/csv',
+            filename=output_filename
+        )
+    except Exception as e:
+        # Garante que qualquer outra exceção seja tratada como um erro do servidor
+        raise HTTPException(status_code=500, detail=f"Ocorreu um erro inesperado no servidor: {e}")
 
 if __name__ == "__main__":
     import multiprocessing

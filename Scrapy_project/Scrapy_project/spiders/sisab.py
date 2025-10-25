@@ -1,15 +1,13 @@
 import scrapy
-import os
 
-# O spider agora é independente e não herda mais de DateFinderSpider
 class SisabSpider(scrapy.Spider):
-    name = "sisab"
+    name = "spider-sisab"
 
     def __init__(self, datas_alvo=None, output_file=None, *args, **kwargs):
         """
-        Este método é chamado quando o spider é criado pela API.
+        Este método é chamado quando o spider é iniciado pela API.
         - datas_alvo: A lista de datas escolhida pelo usuário.
-        - output_file: O caminho do arquivo temporário onde o CSV deve ser salvo.
+        - output_file: O caminho do arquivo onde o CSV deve ser salvo.
         """
         super().__init__(*args, **kwargs)
         self.datas_alvo = datas_alvo or []
@@ -20,6 +18,7 @@ class SisabSpider(scrapy.Spider):
         if not self.output_file:
             self.logger.error("Spider SisabSpider iniciado sem o parâmetro 'output_file'.")
 
+
     def start_requests(self):
         """
         Faz o primeiro GET para a página de relatórios para capturar o ViewState.
@@ -29,6 +28,7 @@ class SisabSpider(scrapy.Spider):
             "User-Agent": "Mozilla/5.0"
         }
         yield scrapy.Request(url=url, callback=self.parse_and_submit)
+
 
     def parse_and_submit(self, response):
         """
@@ -53,24 +53,46 @@ class SisabSpider(scrapy.Spider):
             "dtBasicExample_length": "10",
             "lsSigtap": "",
             "td-ls-sigtap_length": "10",
+
+            # Unidade Geografica
             "unidGeo": "estado",
+
+            # Unidades Federativas
             "estados": [
                 "AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT",
                 "PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"
             ],
+
+            # Periodo de Datas
             "j_idt76": datas_para_usar,
+
+            # Linha da Tabela
             "selectLinha": "ATD.CO_UF_IBGE",
+
+            # Coluna da Tabela
             "selectcoluna": "CO_TIPO_ATENDIMENTO",
+
+            # Equipes de Atendimento
             "j_idt89": ["eq-esf","eq-eacs","eq-nasf","eq-eab","eq-ecr","eq-sb","eq-epen","eq-eap"],
+
+            # Categorias de Profissional
             "categoriaProfissional": [
                 "3","5","6","7","8","9","10","11","12","13","14","15","16","17",
                 "18","19","20","21","22","23","24","25","26","27","30","31"
             ],
             "idadeInicio": "0",
             "idadeFim": "0",
+
+            # Locais de Atendimento
             "localAtendimento": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
+
+            # Tipo de Atendimento
             "tipoAtendimento": ["2", "5", "6"],
+
+            # Tipo de Produção
             "tpProducao": "4",
+
+            # Condição de Avaliação
             "condicaoAvaliada": "ABP014",
             "javax.faces.ViewState": viewstate,
             "j_idt192": "j_idt192"
@@ -91,6 +113,7 @@ class SisabSpider(scrapy.Spider):
             headers=headers,
             callback=self.save_csv,
         )
+
 
     def save_csv(self, response):
         """

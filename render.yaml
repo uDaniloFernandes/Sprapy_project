@@ -1,7 +1,6 @@
-# render.yaml - Instruções de deploy para a plataforma Render (Arquitetura Síncrona)
+# render.yaml - Instruções de deploy para a plataforma Render
 
 services:
-  # O único serviço necessário é a API Web, que agora executa tudo.
   - type: web
     name: sisab-api
     env: python
